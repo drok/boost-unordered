@@ -1,4 +1,5 @@
 // Copyright (C) 2022-2023 Christian Mazakas
+// Copyright (C) 2024 Joaquin M Lopez Munoz
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
@@ -11,6 +12,7 @@
 #include <boost/unordered/concurrent_flat_set_fwd.hpp>
 #include <boost/unordered/detail/foa/flat_set_types.hpp>
 #include <boost/unordered/detail/foa/table.hpp>
+#include <boost/unordered/detail/serialize_container.hpp>
 #include <boost/unordered/detail/type_traits.hpp>
 #include <boost/unordered/unordered_flat_set_fwd.hpp>
 
@@ -67,6 +69,10 @@ namespace boost {
         typename std::allocator_traits<allocator_type>::const_pointer;
       using iterator = typename table_type::iterator;
       using const_iterator = typename table_type::const_iterator;
+
+#if defined(BOOST_UNORDERED_ENABLE_STATS)
+      using stats = typename table_type::stats;
+#endif
 
       unordered_flat_set() : unordered_flat_set(0) {}
 
@@ -169,6 +175,7 @@ namespace boost {
       {
       }
 
+      template <bool avoid_explicit_instantiation = true>
       unordered_flat_set(
         concurrent_flat_set<Key, Hash, KeyEqual, Allocator>&& other)
           : table_(std::move(other.table_))
@@ -187,6 +194,13 @@ namespace boost {
         noexcept(std::declval<table_type&>() = std::declval<table_type&&>()))
       {
         table_ = std::move(other.table_);
+        return *this;
+      }
+
+      unordered_flat_set& operator=(std::initializer_list<value_type> il)
+      {
+        this->clear();
+        this->insert(il.begin(), il.end());
         return *this;
       }
 
@@ -470,6 +484,14 @@ namespace boost {
 
       void reserve(size_type n) { table_.reserve(n); }
 
+#if defined(BOOST_UNORDERED_ENABLE_STATS)
+      /// Stats
+      ///
+      stats get_stats() const { return table_.get_stats(); }
+
+      void reset_stats() noexcept { table_.reset_stats(); }
+#endif
+
       /// Observers
       ///
 
@@ -516,6 +538,7 @@ namespace boost {
       unordered_flat_set<Key, Hash, KeyEqual, Allocator>& set,
       unsigned int version)
     {
+      detail::serialize_container(ar, set, version);
     }
 
 #if defined(BOOST_MSVC)
